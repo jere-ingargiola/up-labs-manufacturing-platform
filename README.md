@@ -12,7 +12,7 @@
 * Provides real-time production monitoring and predictive maintenance
 * Optimizes custom part manufacturing schedules using complex BOMs
 * Tracks quality metrics and compliance for critical components
-* Enables collaboration between engineering, production, and supply chain teams
+* Enables collaboration between engineering, production, and supply chain teams<br><br>
 
 **Business Model:** SaaS subscription, priced by number of production lines and data volume processed<br><br>
 

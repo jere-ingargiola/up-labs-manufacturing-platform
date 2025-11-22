@@ -55,7 +55,7 @@ Batch analytics reduces compute costs and allows for larger, cheaper storage, bu
 
 **Hybrid approach:** Shared core infrastructure for efficiency, with isolated VPCs and dedicated encryption keys per customer for compliance and security.
 
-T**rade-Offs:**
+#### Trade-Offs: Multi-Tenancy
 
 Shared infrastructure lowers cost and simplifies scaling, but increases risk of cross-tenant data exposure.
 Isolated environments improve security and compliance (ITAR, defense contractors), but increase operational complexity and cost.
@@ -99,7 +99,7 @@ Data Lake (AWS S3): For raw and historical analytics.
 * CloudWatch + SNS: For monitoring and alerting.
 * Grafana: For visualization and dashboards.
 
-#### Trade-Offs
+#### Trade-Offs: Technology Stack
 
 * Managed cloud services (AWS MSK, SageMaker, EKS) reduce operational burden but may increase vendor lock-in and cost.
 * Open-source alternatives can lower cost but require more maintenance and expertise.
@@ -111,6 +111,48 @@ Data Lake (AWS S3): For raw and historical analytics.
 
 * VPC isolation, IAM roles, KMS encryption, audit logging, and regular security reviews.
 
-#### Trade-Offs
+#### Trade-Offs: Security & Compliance
 
 * Stronger security may slow down development and increase costs, but is essential for defense and ITAR compliance.
+
+### Stream Processing Decision for MIP
+
+#### Requirements
+
+* Real-time ingestion and processing of IoT sensor data from manufacturing equipment and assembly lines.
+* Safety alerts must be processed within 500ms.
+* Scalable to handle high data volumes (10TB/month/facility).
+* Integration with TimescaleDB for storage and downstream analytics.
+
+#### Recommended Solution: Apache Kafka + Apache Flink (Managed on AWS)
+
+##### Why Kafka (AWS MSK)?
+
+* High-throughput, low-latency event streaming.
+* Durable message storage and replay for reliability.
+* Scalable: Easily handles thousands of events per second.
+* Integration: Works well with Flink, TimescaleDB, and other analytics tools.
+* Managed Service: AWS MSK reduces operational overhead.
+
+##### Why Flink (AWS Kinesis Data Analytics or Self-Managed)?
+
+* Real-time processing: Detect anomalies, trigger safety alerts, and enrich data streams.
+* Complex event processing: Windowing, aggregations, and pattern detection.
+* Low-latency: Designed for sub-second event handling.
+* Scalable: Can process streams from multiple facilities in parallel.
+
+##### Data Flow Example
+
+* IoT sensors send data to a webhook endpoint.
+* Webhook pushes events into a Kafka topic (MSK).
+* Flink consumes events from Kafka, processes them in real time:
+**Detects anomalies (e.g., temperature spikes, vibration outliers).
+**Triggers safety alerts if thresholds are exceeded.
+**Writes processed events to TimescaleDB for storage and analytics.
+**Sends notifications to application layer or monitoring tools (CloudWatch/SNS).
+
+#### Trade-Offs
+
+* Managed services (MSK, Kinesis Data Analytics) reduce operational burden but increase cost and vendor lock-in.
+* Self-managed Flink/Kafka can lower costs but require more DevOps expertise.
+* Kafka + Flink is a proven, scalable combo for industrial IoT, but alternatives (e.g., AWS Kinesis Streams + Lambda) may be considered for simpler use cases.

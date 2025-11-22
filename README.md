@@ -146,10 +146,10 @@ Data Lake (AWS S3): For raw and historical analytics.
 * IoT sensors send data to a webhook endpoint.
 * Webhook pushes events into a Kafka topic (MSK).
 * Flink consumes events from Kafka, processes them in real time:
-**Detects anomalies (e.g., temperature spikes, vibration outliers).
-**Triggers safety alerts if thresholds are exceeded.
-**Writes processed events to TimescaleDB for storage and analytics.
-**Sends notifications to application layer or monitoring tools (CloudWatch/SNS).
+  * Detects anomalies (e.g., temperature spikes, vibration outliers).
+  * Triggers safety alerts if thresholds are exceeded.
+  * Writes processed events to TimescaleDB for storage and analytics.
+  * Sends notifications to application layer or monitoring tools (CloudWatch/SNS).
 
 #### Trade-Offs
 

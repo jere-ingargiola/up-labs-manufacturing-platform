@@ -5,16 +5,18 @@
 
 ## Business Context
 
-**Company:** UP.Labs (new venture)<br>
-**Product:** Manufacturing Intelligence Platform (MIP) for custom heavy equipment<br> manufacturers (excavators, cranes, drilling rigs)<br>
-**Core Platform Capabilities:**<br>
+**Company:** UP.Labs (new venture)<br><br>
+
+**Core Platform Capabilities:**<br><br>
 * Connects to IoT sensors on manufacturing equipment and assembly lines
 * Provides real-time production monitoring and predictive maintenance
 * Optimizes custom part manufacturing schedules using complex BOMs
 * Tracks quality metrics and compliance for critical components
 * Enables collaboration between engineering, production, and supply chain teams
-**Business Model:** SaaS subscription, priced by number of production lines and data volume processed<br>
-**Current Status:**<br>
+
+**Business Model:** SaaS subscription, priced by number of production lines and data volume processed<br><br>
+
+**Current Status:**<br><br>
 * Pre-revenue, 24-month runway
 * 1 Fortune 500 beta customer (heavy equipment manufacturer)
 * Target: 3 enterprise customers in first 18 months

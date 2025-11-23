@@ -1,0 +1,49 @@
+{
+  "name": "manufacturing-platform-cdk",
+  "version": "1.0.0",
+  "description": "AWS CDK infrastructure for Manufacturing Platform",
+  "main": "lib/manufacturing-platform-stack.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "cdk": "cdk",
+    "deploy": "npm run build && cdk deploy",
+    "deploy:dev": "npm run build && cdk deploy --context environment=development",
+    "deploy:prod": "npm run build && cdk deploy --context environment=production",
+    "deploy:tenant": "npm run build && cdk deploy --context tenantId=$TENANT_ID --context environment=$ENVIRONMENT",
+    "diff": "cdk diff",
+    "synth": "cdk synth",
+    "destroy": "cdk destroy",
+    "bootstrap": "cdk bootstrap"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.8",
+    "@types/node": "20.8.10",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "aws-cdk": "2.108.1",
+    "ts-node": "^10.9.1",
+    "typescript": "~5.2.2"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.108.1",
+    "constructs": "^10.0.0",
+    "source-map-support": "^0.5.21"
+  },
+  "jest": {
+    "testMatch": [
+      "**/*.test.ts"
+    ],
+    "preset": "ts-jest",
+    "testEnvironment": "node"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jere-ingargiola/up-labs-manufacturing-platform.git"
+  },
+  "author": "UP Labs",
+  "license": "MIT"
+}

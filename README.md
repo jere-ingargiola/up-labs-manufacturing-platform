@@ -90,11 +90,11 @@ Data Lake (AWS S3): For raw and historical analytics.
 * Containerized microservices (EKS/Kubernetes): For scalability and modularity.
 * Frontend: React.js for dashboards and collaboration tools.
 
-#### API Layer
+#### API Layer (Technology Stack)
 
 * API Gateway (REST/GraphQL): For secure, scalable access.
 
-#### Other Infrastructure:
+#### Other Infrastructure
 
 * CloudWatch + SNS: For monitoring and alerting.
 * Grafana: For visualization and dashboards.
@@ -156,3 +156,139 @@ Data Lake (AWS S3): For raw and historical analytics.
 * Managed services (MSK, Kinesis Data Analytics) reduce operational burden but increase cost and vendor lock-in.
 * Self-managed Flink/Kafka can lower costs but require more DevOps expertise.
 * Kafka + Flink is a proven, scalable combo for industrial IoT, but alternatives (e.g., AWS Kinesis Streams + Lambda) may be considered for simpler use cases.
+
+### AI/ML Integration
+
+The platform leverages AWS SageMaker for predictive maintenance, anomaly detection, and schedule optimization.
+
+* Model Training: SageMaker trains models using historical sensor and production data stored in S3 and TimescaleDB.
+* Real-Time Inference: Flink and Lambda functions invoke SageMaker endpoints to perform real-time anomaly detection and predictive analytics on incoming sensor data.
+* Batch Analytics: Scheduled jobs use SageMaker for deeper analysis and optimization, with results stored in TimescaleDB or S3 for reporting and dashboarding.
+* Extensibility: The architecture supports integration with other ML platforms or custom EC2-based ML stacks if needed.
+
+#### API Layer
+
+The platform exposes secure, scalable APIs for internal and external clients:
+
+API Gateway provides RESTful and/or GraphQL endpoints for:
+
+* Equipment status queries
+* Production metrics retrieval
+* Alert history access
+* Integration with engineering, production, and supply chain systems
+
+Lambda Functions handle business logic, authentication, and data aggregation behind the API endpoints.
+Security: All APIs are protected with IAM roles, API keys, and VPC isolation as appropriate.
+
+#### Monitoring & Alerting
+
+Robust monitoring and alerting are built in to ensure reliability and rapid incident response:
+
+* AWS CloudWatch collects metrics, logs, and events from all major components (Lambda, EC2, Kafka, Flink, SageMaker).
+* SNS (Simple Notification Service) delivers real-time alerts to operations teams via email, SMS, or integrated chat tools.
+* Grafana provides interactive dashboards for visualizing equipment status, production metrics, and alert history, connecting to TimescaleDB/Postgres and Athena.
+* Audit Logging: CloudTrail records API calls and changes for compliance and troubleshooting.
+
+#### Security & Compliance (Details)
+
+Security and regulatory compliance are core to the platform’s design:
+
+* VPC Isolation: Each customer’s data and compute resources are isolated in dedicated VPCs.
+* IAM Roles: Fine-grained access control for all AWS resources and services.
+* KMS Encryption: All sensitive data is encrypted at rest and in transit using AWS Key Management Service.
+* Audit Logging: CloudTrail and CloudWatch provide comprehensive logging and monitoring for all activities.
+* Compliance: Regular security reviews and adherence to ITAR and defense contractor requirements.
+
+## Code
+
+### Sample IoT Payload
+
+```json
+{
+  "equipment_id": "EQ-123",
+  "timestamp": "2025-11-23T14:00:00Z",
+  "temperature": 78.5,
+  "vibration": 0.12,
+  "pressure": 101.3
+}
+```
+
+### Anomoly Detection Alogorithm
+
+In this example the thresholds are global for all machines, however, ideally these would be configured by machine (or machine model).
+
+Current thresholds are temperature  > 90°C, vibration > 0.2.
+
+### Endpoints
+
+* equipment/{id}/status: Latest sensor readings and current alert state
+
+* /equipment/{id}/metrics: Historical metrics (with optional time range)
+
+* /equipment/{id}/alerts: Alert history (with filters for status, time, etc.)
+
+## Folder Structure
+
+production-line-monitor/
+├── lambdas/                          # Lambda functions for API endpoints
+│   ├── ingestSensorData/             # POST /webhook/sensor-data
+│   │   ├── handler.ts
+│   │   ├── anomaly.ts
+│   │   ├── models.ts
+│   │   ├── tsconfig.json
+│   │   ├── package.json
+│   ├── getEquipmentStatus/           # GET /equipment/{id}/status
+│   │   ├── handler.ts
+│   │   ├── models.ts
+│   │   ├── tsconfig.json
+│   │   ├── package.json
+│   ├── getEquipmentMetrics/          # GET /equipment/{id}/metrics
+│   │   ├── handler.ts
+│   │   ├── models.ts
+│   │   ├── tsconfig.json
+│   │   ├── package.json
+│   ├── getEquipmentAlerts/           # GET /equipment/{id}/alerts
+│   │   ├── handler.ts
+│   │   ├── models.ts
+│   │   ├── tsconfig.json
+│   │   ├── package.json
+│   ├── transactionalOps/             # For transactional endpoints (BOMs, schedules, etc.)
+│   │   ├── handler.ts
+│   │   ├── models.ts
+│   │   ├── tsconfig.json
+│   │   ├── package.json
+│   ├── shared/                       # Shared code for DB/S3 access
+│   │   ├── database.ts               # TimescaleDB/Postgres connection logic
+│   │   ├── s3Utils.ts                # S3 access helpers
+│   │   ├── models.ts                 # Shared interfaces/types
+│   │   ├── config.ts                 # Env/config management
+│   │   ├── tsconfig.json
+│   │   ├── package.json
+├── flink/                            # Flink job code/configs (Java/Scala/TypeScript for config/scripts)
+│   ├── job.java                      # Flink pipeline for event routing (Java/Scala)
+│   ├── config.yaml                   # Flink job configuration
+│   └── README.md
+├── infra/                            # AWS CDK infrastructure as code (TypeScript)
+│   ├── bin/
+│   │   └── cdk.ts                    # CDK app entry point
+│   ├── lib/
+│   │   └── monitor-stack.ts          # Main CDK stack definition
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── cdk.json
+│   └── README.md
+├── tests/                            # Unit and integration tests (Jest or similar)
+│   ├── ingestSensorData.test.ts
+│   ├── getEquipmentStatus.test.ts
+│   ├── getEquipmentMetrics.test.ts
+│   ├── getEquipmentAlerts.test.ts
+│   ├── transactionalOps.test.ts
+│   ├── anomaly.test.ts
+│   └── s3Utils.test.ts
+├── Dockerfile                        # For local Lambda dev (optional)
+├── docker-compose.yml                # Local dev orchestration (optional)
+├── package.json                      # Top-level dependencies/scripts (if needed)
+├── tsconfig.json                     # Top-level TypeScript config (if needed)
+├── .env.example                      # Example environment variables
+├── README.md                         # Project overview & API docs
+└── .gitignore                        # Git ignore file

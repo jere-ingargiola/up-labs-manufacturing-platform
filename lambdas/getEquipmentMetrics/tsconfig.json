@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "../..",
+    "baseUrl": "../..",
+    "lib": ["es2020", "dom"],
+    "target": "es2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "paths": {
+      "../../models": ["./models"],
+      "../../models/*": ["./models/*"],
+      "../../services": ["./services"],
+      "../../services/*": ["./services/*"]
+    }
+  },
+  "include": [
+    "handler.ts",
+    "../../models/**/*",
+    "../../services/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

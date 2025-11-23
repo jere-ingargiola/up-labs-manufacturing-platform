@@ -1,16 +1,19 @@
 # Hybrid Multi-Tenant/Single-Tenant Architecture
 
 ## Overview
+
 This manufacturing platform implements a hybrid tenancy model that supports both multi-tenant SaaS deployments and dedicated single-tenant installations, optimized for different customer segments and compliance requirements.
 
 ## 🏗️ **Tenancy Architecture Strategy**
 
 ### **Hybrid Model Benefits**
+
 - **Multi-Tenant**: Cost-effective for SMB customers, shared infrastructure
 - **Single-Tenant**: Enterprise security/compliance, dedicated resources  
 - **Hybrid**: Flexible deployment based on customer requirements and scale
 
 ### **Tenancy Decision Matrix**
+
 | Customer Segment | Deployment Model | Rationale |
 |------------------|------------------|-----------|
 | SMB (< 100 assets) | Multi-Tenant | Cost optimization, shared resources |
@@ -21,6 +24,7 @@ This manufacturing platform implements a hybrid tenancy model that supports both
 ## 🎯 **Implementation Strategy**
 
 ### **1. Tenant-Aware Data Model**
+
 ```sql
 -- All tables include tenant_id for multi-tenant isolation
 CREATE TABLE sensor_data_raw (
@@ -55,6 +59,7 @@ CREATE POLICY tenant_isolation ON sensor_data_raw
 ```
 
 ### **2. Tenant-Aware Infrastructure**
+
 ```yaml
 # Multi-Tenant Shared Infrastructure
 shared_resources:
@@ -92,6 +97,7 @@ dedicated_resources:
 ```
 
 ### **3. Tenant Resolution & Context**
+
 ```typescript
 // Tenant resolution middleware
 interface TenantContext {
@@ -138,6 +144,7 @@ class TenantResolver {
 ## 🔧 **Multi-Tenant Optimizations**
 
 ### **Database Connection Management**
+
 ```typescript
 // Tenant-aware connection pooling
 class TenantAwareDataService {
@@ -171,6 +178,7 @@ class TenantAwareDataService {
 ```
 
 ### **Tenant-Aware Storage Service**
+
 ```typescript
 export async function storeSensorDataMultiTenant(
   sensorData: SensorData, 
@@ -222,6 +230,7 @@ private async storeSingleTenant(
 ```
 
 ### **Tenant-Aware Alert Processing**
+
 ```typescript
 export async function processTenantAlert(
   alert: Alert,
@@ -278,6 +287,7 @@ private async publishTenantCloudWatchMetrics(
 ## 🚀 **Deployment Patterns**
 
 ### **Multi-Tenant SaaS Deployment**
+
 ```yaml
 # Shared Infrastructure (Cost Optimized)
 shared_services:
@@ -303,6 +313,7 @@ shared_services:
 ```
 
 ### **Single-Tenant Enterprise Deployment**
+
 ```yaml
 # Dedicated Infrastructure (Security/Compliance Optimized)
 dedicated_per_tenant:
@@ -330,6 +341,7 @@ dedicated_per_tenant:
 ### **Hybrid Deployment Benefits**
 
 #### **Cost Optimization**
+
 ```yaml
 Multi-Tenant Benefits:
   - Shared infrastructure costs (60-80% cost reduction)
@@ -345,6 +357,7 @@ Single-Tenant Benefits:
 ```
 
 #### **Feature Differentiation**
+
 ```yaml
 Tier-Based Features:
   Basic (Multi-Tenant):
@@ -370,6 +383,7 @@ Tier-Based Features:
 ## 📊 **Tenant Management & Operations**
 
 ### **Tenant Onboarding Automation**
+
 ```typescript
 class TenantProvisioningService {
   async provisionTenant(request: TenantProvisioningRequest): Promise<TenantContext> {
@@ -400,6 +414,7 @@ class TenantProvisioningService {
 ```
 
 ### **Tenant Monitoring & Analytics**
+
 ```yaml
 Per-Tenant Metrics:
   usage_metrics:
@@ -424,12 +439,14 @@ Per-Tenant Metrics:
 ## 🔒 **Security & Compliance**
 
 ### **Multi-Tenant Security**
+
 - **Data Isolation**: Row-level security (RLS) and tenant partitioning
 - **Access Control**: Tenant-scoped JWT tokens and API keys
 - **Network Security**: Shared infrastructure with logical isolation
 - **Audit Logging**: Tenant-attributed access logs
 
 ### **Single-Tenant Security**  
+
 - **Infrastructure Isolation**: Dedicated VPCs and security groups
 - **Data Encryption**: Customer-managed KMS keys
 - **Network Isolation**: Private endpoints and customer networking

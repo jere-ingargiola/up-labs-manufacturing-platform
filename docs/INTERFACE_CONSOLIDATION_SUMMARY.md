@@ -7,6 +7,7 @@ Successfully moved **ALL interfaces from services and handlers** into the **cent
 ## 📁 **New Models Structure**
 
 ### **Core Domain Models** (Business Logic)
+
 - **`models/SensorData.ts`** - IoT sensor readings and telemetry
 - **`models/Equipment.ts`** - Manufacturing equipment definitions and status
 - **`models/Anomaly.ts`** - Anomaly detection and alert definitions
@@ -14,6 +15,7 @@ Successfully moved **ALL interfaces from services and handlers** into the **cent
 - **`models/Common.ts`** - Shared validation and response types
 
 ### **Infrastructure & Platform Models** (Technical)
+
 - **`models/ApiGateway.ts`** - AWS API Gateway event/response types
 - **`models/Database.ts`** - Storage, retention, and database result types
 - **`models/Alerts.ts`** - Alert processing, notifications, and CloudWatch
@@ -23,6 +25,7 @@ Successfully moved **ALL interfaces from services and handlers** into the **cent
 ## 🔄 **Before & After Comparison**
 
 ### **❌ Before: Scattered Interfaces**
+
 ```typescript
 // In storageService.ts
 interface StorageResult { ... }
@@ -46,6 +49,7 @@ interface APIGatewayProxyResult { ... }
 ```
 
 ### **✅ After: Centralized Models**
+
 ```typescript
 // All services and handlers now import from models
 import { 
@@ -73,18 +77,21 @@ import {
 ## 🎯 **Benefits Achieved**
 
 ### **🔍 Developer Experience**
+
 - **Single Source of Truth** - All type definitions in one place
 - **Better IntelliSense** - IDE can find and suggest types more easily  
 - **Consistent Imports** - Clear pattern: business logic from `models`, utilities from `services`
 - **Reduced Cognitive Load** - Developers know exactly where to find/add interfaces
 
 ### **🛠️ Maintainability**
+
 - **DRY Principle** - Zero duplicate interface definitions
 - **Easy Refactoring** - Change an interface once, updates everywhere
 - **Version Control** - Interface changes are clearly visible in git diffs
 - **Documentation** - Interfaces are self-documenting in organized files
 
 ### **🚀 Scalability**
+
 - **Team Collaboration** - Multiple developers can work on different domains without conflicts
 - **New Features** - Easy to add new interfaces in the right domain area
 - **Testing** - Centralized types make mocking and testing easier
@@ -93,6 +100,7 @@ import {
 ## 📦 **Updated Import Patterns**
 
 ### **Services Import Pattern**
+
 ```typescript
 // Clean, domain-focused imports
 import { 
@@ -106,6 +114,7 @@ import {
 ```
 
 ### **Lambda Handlers Import Pattern**
+
 ```typescript
 // All necessary types from centralized location
 import {
@@ -118,16 +127,19 @@ import {
 ## 🏗️ **Architecture Principles Applied**
 
 ### **Domain-Driven Design**
+
 - **Core Domain** - SensorData, Equipment, Production (business logic)
 - **Supporting Domains** - Alerts, Cost, Tenant (platform features)  
 - **Infrastructure** - ApiGateway, Database (technical concerns)
 
-### **Separation of Concerns** 
+### **Separation of Concerns**
+
 - **Models** - Pure data structures and type definitions
 - **Services** - Business logic and external integrations
 - **Handlers** - Request/response processing and orchestration
 
 ### **Clean Architecture**
+
 - **Inner Layer** - Domain models (no dependencies)
 - **Middle Layer** - Services (depend on models)
 - **Outer Layer** - Handlers (depend on models + services)

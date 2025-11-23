@@ -1,11 +1,13 @@
 # Multi-Tier Data Architecture & Critical Alert System
 
 ## Overview
+
 This manufacturing platform implements a comprehensive 3-tier data storage strategy with real-time critical alert processing that meets <500ms SLA requirements.
 
 ## 🏗️ **Data Storage Architecture**
 
 ### **Tier 1: TimescaleDB (Real-time Analysis - 30 Day TTL)**
+
 ```sql
 -- Automatic 30-day data retention policy
 CREATE TABLE sensor_data_raw (
@@ -27,12 +29,14 @@ SELECT add_retention_policy('sensor_data_raw', INTERVAL '30 days');
 ```
 
 **Purpose:**
+
 - ✅ Real-time dashboard queries (<100ms)
 - ✅ Anomaly detection with historical context
 - ✅ Automatic data cleanup (30-day TTL)
 - ✅ Optimized time-series performance
 
 ### **Tier 2: PostgreSQL (Transactional Data - Long-term)**
+
 ```sql
 -- Equipment status and metadata
 CREATE TABLE equipment_status (
@@ -49,6 +53,7 @@ CREATE TABLE equipment_status (
 ```
 
 **Purpose:**
+
 - ✅ Equipment master data and current status
 - ✅ User management and permissions
 - ✅ Alert acknowledgments and resolutions
@@ -56,7 +61,8 @@ CREATE TABLE equipment_status (
 - ✅ ACID compliance for critical transactions
 
 ### **Tier 3: S3 (Historical Archive - Unlimited Retention)**
-```
+
+```text
 Bucket Structure:
 manufacturing-data-archive/
 ├── sensor-data/
@@ -71,6 +77,7 @@ manufacturing-data-archive/
 ```
 
 **Purpose:**
+
 - ✅ Long-term historical analysis
 - ✅ Data lake for machine learning
 - ✅ Compliance and audit requirements
@@ -79,7 +86,8 @@ manufacturing-data-archive/
 ## 🚨 **Critical Alert Processing Pipeline**
 
 ### **Alert Flow (Sub-500ms End-to-End)**
-```
+
+```text
 IoT Sensor Data → Lambda Ingestion
                       ↓
               [10ms] Parse & Validate
@@ -97,7 +105,9 @@ IoT Sensor Data → Lambda Ingestion
 ```
 
 ### **CloudWatch Integration**
+
 **Custom Metrics Published:**
+
 ```yaml
 CriticalAlerts:
   - Dimensions: [EquipmentId, Severity, AlertType]
@@ -126,6 +136,7 @@ Equipment.Pressure:
 ```
 
 **CloudWatch Alarms:**
+
 ```yaml
 Critical Alert Rate:
   MetricName: CriticalAlerts
@@ -144,7 +155,9 @@ Processing Latency SLA:
 ```
 
 ### **SNS Notification System**
+
 **Topic Structure:**
+
 ```yaml
 manufacturing-critical-alerts:
   - Subscribers: [Operations Team Email, SMS, Slack Webhook]
@@ -160,7 +173,8 @@ manufacturing-sla-violations:
 ```
 
 **Message Format:**
-```
+
+```text
 🚨 CRITICAL MANUFACTURING ALERT
 
 🚨 Alert ID: alert_12345
@@ -186,6 +200,7 @@ manufacturing-sla-violations:
 ## 📊 **Data Flow & Performance**
 
 ### **Write Performance Targets**
+
 | Operation | Target | Actual | SLA |
 |-----------|---------|---------|-----|
 | Alert Processing | <100ms | ~80ms | ✅ |
@@ -196,6 +211,7 @@ manufacturing-sla-violations:
 | SNS Notification | <100ms | ~80ms | ✅ |
 
 ### **Storage Capacity Planning**
+
 ```yaml
 TimescaleDB (30-day rolling):
   - Data Points/Day: 1M sensor readings
@@ -218,6 +234,7 @@ S3 Archive (Unlimited):
 ## 🔧 **Implementation Services**
 
 ### **Multi-Tier Storage Service (`storageService.ts`)**
+
 ```typescript
 // Simultaneous write to all tiers
 const result = await storeSensorDataMultiTier(sensorData);
@@ -225,6 +242,7 @@ const result = await storeSensorDataMultiTier(sensorData);
 ```
 
 ### **Alert Notification Service (`alertNotificationService.ts`)**
+
 ```typescript
 // Critical alert with CloudWatch + SNS
 const result = await processCriticalAlert(alert, anomaly);
@@ -232,6 +250,7 @@ const result = await processCriticalAlert(alert, anomaly);
 ```
 
 ### **Enhanced Lambda Handler (`ingestSensorData`)**
+
 ```typescript
 // Priority: Critical alerts first (parallel processing)
 const criticalAlerts = anomalies.filter(a => a.severity === 'critical');
@@ -252,6 +271,7 @@ Promise.all([
 ## 🚀 **Deployment Configuration**
 
 ### **Environment Variables**
+
 ```bash
 # TimescaleDB Configuration
 TIMESCALE_HOST=manufacturing-timescale.cluster.amazonaws.com
@@ -277,6 +297,7 @@ STORAGE_TIMEOUT_MS=5000
 ```
 
 ### **IAM Permissions**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -310,6 +331,7 @@ STORAGE_TIMEOUT_MS=5000
 ## 📈 **Monitoring & Alerting**
 
 ### **Key Metrics Dashboard**
+
 1. **Real-time Metrics (1-minute intervals)**
    - Active equipment count
    - Critical alerts per minute
@@ -329,6 +351,7 @@ STORAGE_TIMEOUT_MS=5000
    - Cost per GB stored
 
 ### **SLA Monitoring**
+
 ```yaml
 Processing Latency SLA: 95% < 500ms
   Current: 99.2% < 400ms ✅

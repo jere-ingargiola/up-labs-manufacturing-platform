@@ -5,6 +5,7 @@
 ### Current Optimizations Implemented
 
 #### 1. **Lambda Handler Optimizations** (`ingestSensorData`)
+
 - ✅ **Minimal Logging**: Reduced console output during critical path
 - ✅ **Fast Validation**: Only check required fields (equipment_id, timestamp)
 - ✅ **Parallel Processing**: Run anomaly detection concurrently
@@ -13,13 +14,15 @@
 - ✅ **Latency Tracking**: Built-in SLA monitoring (processing_latency_ms)
 
 #### 2. **Anomaly Detection Service** (`anomalyService.ts`)
+
 - ✅ **Parallel Detection**: Temperature, vibration, pressure checked concurrently
 - ✅ **Threshold-Based**: Simple, fast rule-based detection (<10ms)
 - ✅ **Minimal Logging**: Only log critical anomalies
 - ✅ **Inline Processing**: No external API calls or complex calculations
 
 #### 3. **Kafka Service Optimizations** (`kafkaService.ts`)
-- ✅ **Ultra-Low Latency Config**: 
+
+- ✅ **Ultra-Low Latency Config**:
   - `lingerMs: 0` (send immediately)
   - `maxBatchSize: 1` (no batching)
   - `acks: 1` (leader-only acknowledgment)
@@ -29,6 +32,7 @@
 - ✅ **Dedicated Alert Topic**: `manufacturing-alerts-priority`
 
 #### 4. **Ultra-Fast Alert Handler** (`ultraFastAlerts`)
+
 - ✅ **Dedicated Lambda**: Specialized for <100ms processing
 - ✅ **Inline Detection**: No function calls, direct threshold checks
 - ✅ **Multiple Dispatch**: SNS, EventBridge, WebSocket simultaneously
@@ -37,7 +41,7 @@
 
 ### Architecture Flow (Latency Breakdown)
 
-```
+```text
 IoT Sensor Data → API Gateway → Lambda (ingestSensorData)
                                     ↓
                               [10ms] Parse & Validate
@@ -57,7 +61,7 @@ Target SLA: <500ms ✅
 
 ### Alternative Ultra-Fast Path
 
-```
+```text
 IoT Sensor → Kinesis Data Streams → ultraFastAlerts Lambda
                                           ↓
                                     [5ms] Inline Detection
@@ -72,6 +76,7 @@ Total Processing: ~15ms ✅
 ### Infrastructure Requirements for <500ms SLA
 
 #### 1. **Lambda Configuration**
+
 ```yaml
 Memory: 1024MB+ (more CPU for faster processing)
 Timeout: 30s (safety margin)
@@ -80,6 +85,7 @@ Provisioned Concurrency: 10+ (eliminate cold start latency)
 ```
 
 #### 2. **Kafka/MSK Configuration**
+
 ```yaml
 Topics:
   - manufacturing-alerts-priority: 
@@ -92,12 +98,14 @@ Topics:
 ```
 
 #### 3. **Network Optimizations**
+
 - VPC Endpoints for AWS services (eliminate internet routing)
 - Lambda in same AZ as MSK brokers
 - ElastiCache for threshold caching (if needed)
 - Direct Connect for on-premises IoT gateways
 
 #### 4. **Monitoring & Alerting**
+
 ```yaml
 CloudWatch Metrics:
   - processing_latency_ms (custom metric)
@@ -141,6 +149,7 @@ Alarms:
 ### Trade-offs Made for Speed
 
 ✅ **Chosen for Speed:**
+
 - Fire-and-forget critical alerts
 - Simplified anomaly detection
 - Background database writes
@@ -148,6 +157,7 @@ Alarms:
 - Higher compute costs
 
 ❌ **Sacrificed for Speed:**
+
 - Complex ML-based anomaly detection
 - Guaranteed delivery confirmation
 - Detailed audit logging

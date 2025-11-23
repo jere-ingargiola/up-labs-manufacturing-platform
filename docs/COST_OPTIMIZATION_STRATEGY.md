@@ -1,5 +1,6 @@
 # Cost-Optimized Hybrid Architecture for Manufacturing Platform
-# Target: 3 customers, 15 machines each, <$50,000/month
+
+## Target: 3 customers, 15 machines each, <$50,000/month
 
 ## Architecture Decision Matrix
 

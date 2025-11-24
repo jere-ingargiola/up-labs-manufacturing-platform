@@ -148,7 +148,7 @@ describe('TenantConfigService', () => {
         config: {
           ...mockTenant.config,
           database: {
-            connection_string: 'postgresql://dedicated.rds.amazonaws.com:5432/manufacturing',
+            connection_string: 'postgresql://manufacturingplatform-developme-postgresdb113281d2-tsgocyznjzyn.cnqweieki09q.us-east-1.rds.amazonaws.com:5432/manufacturing',
             use_rls: false,
             max_connections: 100
           }
@@ -157,7 +157,7 @@ describe('TenantConfigService', () => {
 
       const config = TenantConfigService.getConnectionConfig(singleTenantConfig);
 
-      expect(config.connectionString).toBe('postgresql://dedicated.rds.amazonaws.com:5432/manufacturing');
+      expect(config.connectionString).toBe('postgresql://manufacturingplatform-development-postgresdb113281d2-tsgocyznjzyn.cnqweieki09q.us-east-1.rds.amazonaws.com:5432/manufacturing');
       expect(config.maxConnections).toBe(100);
       expect(config.ssl).toBe(true);
       expect(config.options).toBeUndefined();

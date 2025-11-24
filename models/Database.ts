@@ -11,6 +11,8 @@ export interface StorageResult {
 export interface S3UploadResult {
   success: boolean;
   key?: string;
+  bucket?: string;
+  size?: number;
   error?: string;
 }
 

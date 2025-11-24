@@ -47,6 +47,12 @@ async function getKafkaProducer(): Promise<Producer> {
 }
 
 export async function publishSensorData(topic: string, data: any): Promise<void> {
+  // Check for mock mode
+  if (process.env.KAFKA_MOCK_MODE === 'true') {
+    console.log(`📤 Mock Kafka publish to ${topic}: ${data.equipment_id || 'unknown'}`);
+    return;
+  }
+  
   try {
     const producer = await getKafkaProducer();
 
@@ -69,6 +75,12 @@ export async function publishSensorData(topic: string, data: any): Promise<void>
 }
 
 export async function publishAlert(topic: string, alert: any): Promise<void> {
+  // Check for mock mode
+  if (process.env.KAFKA_MOCK_MODE === 'true') {
+    console.log(`🚨 Mock Alert publish to ${topic}: ${alert.severity} - ${alert.equipment_id}`);
+    return;
+  }
+  
   try {
     const producer = await getKafkaProducer();
     
@@ -119,6 +131,11 @@ export async function publishAlert(topic: string, alert: any): Promise<void> {
 
 // Graceful shutdown
 export async function disconnectKafka(): Promise<void> {
+  if (process.env.KAFKA_MOCK_MODE === 'true') {
+    console.log('📤 Mock Kafka disconnect');
+    return;
+  }
+  
   if (producer) {
     await producer.disconnect();
     producer = null;

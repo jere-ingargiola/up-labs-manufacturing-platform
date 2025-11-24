@@ -101,6 +101,10 @@ export class TenantResolver {
     // In production, this would query the tenant database
     // For now, return a mock configuration
     
+    // Use mock database endpoints for testing
+    const isMockMode = process.env.MOCK_SERVICES === 'true' || process.env.SKIP_DB_CONNECTIONS === 'true';
+    const dbHost = isMockMode ? 'localhost' : 'manufacturingplatform-development-postgresdb113281d2-tsgocyznjzyn.cnqweieki09q.us-east-1.rds.amazonaws.com';
+    
     const mockTenants: Record<string, TenantContext> = {
       'acme-corp': {
         tenant_id: 'acme-corp',
@@ -114,12 +118,12 @@ export class TenantResolver {
         created_at: '2025-01-01T00:00:00Z',
         config: {
           database: {
-            connection_string: 'postgresql://acme-dedicated.rds.amazonaws.com:5432/manufacturing',
+            connection_string: `postgresql://${dbHost}:5432/manufacturing`,
             use_rls: false,
             max_connections: 100
           },
           storage: {
-            s3_bucket: 'acme-manufacturing-data',
+            s3_bucket: 'manufacturing-platform-archival-development-535002890929',
             encryption_key: 'arn:aws:kms:us-east-1:123456789012:key/acme-key',
             retention_policy: 'unlimited'
           },
@@ -228,6 +232,16 @@ export async function withTenantContext<T>(
 export class TenantConfigService {
   
   static getConnectionConfig(tenant: TenantContext) {
+    // Mock mode for testing - return localhost connections
+    if (process.env.MOCK_SERVICES === 'true' || process.env.SKIP_DB_CONNECTIONS === 'true') {
+      return {
+        connectionString: 'postgresql://localhost:5432/test_manufacturing',
+        maxConnections: 5,
+        ssl: false,
+        mock: true
+      };
+    }
+    
     if (tenant.deployment_type === 'single-tenant') {
       return {
         connectionString: tenant.config.database.connection_string,

@@ -1,17 +1,23 @@
 // Critical Alert Notification Service - CloudWatch + SNS integration
-import { Alert, Anomaly } from '../models';
+import { Alert, Anomaly, AlertNotificationResult, CloudWatchMetric, SNSNotification } from '../models';
+import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
+import { CloudWatchClient, PutMetricDataCommand, StandardUnit } from '@aws-sdk/client-cloudwatch';
 
-interface AlertNotificationResult {
+// Initialize AWS SDK v3 clients
+const snsClient = new SNSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const cloudWatchClient = new CloudWatchClient({ region: process.env.AWS_REGION || 'us-east-1' });
+
+// Extended AlertNotificationResult for internal service use
+interface ServiceAlertResult extends AlertNotificationResult {
   cloudwatch: boolean;
   sns: boolean;
-  latency_ms: number;
-  error?: string;
 }
 
-interface CloudWatchMetric {
+// AWS SDK compatible CloudWatch metric structure
+interface AWSCloudWatchMetric {
   MetricName: string;
   Value: number;
-  Unit: string;
+  Unit: StandardUnit;
   Dimensions: Array<{
     Name: string;
     Value: string;
@@ -19,10 +25,11 @@ interface CloudWatchMetric {
   Timestamp: Date;
 }
 
-interface SNSNotification {
+// AWS SDK compatible SNS notification structure
+interface AWSSNSNotification {
   TopicArn: string;
-  Message: string;
   Subject: string;
+  Message: string;
   MessageAttributes?: {
     [key: string]: {
       DataType: string;
@@ -32,9 +39,11 @@ interface SNSNotification {
 }
 
 // Critical alert processing and notification
-export async function processCriticalAlert(alert: Alert, anomaly?: Anomaly): Promise<AlertNotificationResult> {
+export async function processCriticalAlert(alert: Alert, anomaly?: Anomaly): Promise<ServiceAlertResult> {
   const startTime = Date.now();
-  const result: AlertNotificationResult = {
+  const result: ServiceAlertResult = {
+    success: false,
+    channels_notified: [],
     cloudwatch: false,
     sns: false,
     latency_ms: 0
@@ -49,6 +58,11 @@ export async function processCriticalAlert(alert: Alert, anomaly?: Anomaly): Pro
 
     result.cloudwatch = cloudwatchResult.status === 'fulfilled';
     result.sns = snsResult.status === 'fulfilled';
+    result.success = result.cloudwatch && result.sns;
+    result.channels_notified = [
+      ...(result.cloudwatch ? ['cloudwatch'] : []),
+      ...(result.sns ? ['sns'] : [])
+    ];
     result.latency_ms = Date.now() - startTime;
 
     // Log failures for monitoring
@@ -69,13 +83,13 @@ export async function processCriticalAlert(alert: Alert, anomaly?: Anomaly): Pro
 
 // Publish critical alert metrics to CloudWatch
 async function publishToCloudWatch(alert: Alert, anomaly?: Anomaly): Promise<void> {
-  const metrics: CloudWatchMetric[] = [];
+  const metrics: AWSCloudWatchMetric[] = [];
 
   // Alert count metric
   metrics.push({
     MetricName: 'CriticalAlerts',
     Value: 1,
-    Unit: 'Count',
+    Unit: StandardUnit.Count,
     Dimensions: [
       { Name: 'EquipmentId', Value: alert.equipment_id },
       { Name: 'Severity', Value: alert.severity },
@@ -88,7 +102,7 @@ async function publishToCloudWatch(alert: Alert, anomaly?: Anomaly): Promise<voi
   metrics.push({
     MetricName: 'EquipmentHealth',
     Value: getSeverityScore(alert.severity),
-    Unit: 'None',
+    Unit: StandardUnit.None,
     Dimensions: [
       { Name: 'EquipmentId', Value: alert.equipment_id },
       { Name: 'FacilityId', Value: 'unknown' } // Would extract from equipment data
@@ -110,20 +124,38 @@ async function publishToCloudWatch(alert: Alert, anomaly?: Anomaly): Promise<voi
     });
   }
 
-  // Simulate CloudWatch PutMetricData API call
-  // In production, use AWS SDK CloudWatch client
-  for (const metric of metrics) {
-    console.log(`CloudWatch Metric: ${metric.MetricName} = ${metric.Value} (${alert.equipment_id})`);
-  }
+  // Send metrics to CloudWatch using AWS SDK v3
+  try {
+    const command = new PutMetricDataCommand({
+      Namespace: 'Manufacturing/Alerts',
+      MetricData: metrics.map(metric => ({
+        MetricName: metric.MetricName,
+        Value: metric.Value,
+        Unit: metric.Unit,
+        Dimensions: metric.Dimensions,
+        Timestamp: metric.Timestamp
+      }))
+    });
 
-  // Simulate API latency
-  await new Promise(resolve => setTimeout(resolve, 50));
+    await cloudWatchClient.send(command);
+    console.log(`✅ CloudWatch metrics sent: ${metrics.length} metrics for ${alert.equipment_id}`);
+  } catch (error) {
+    console.error('❌ Failed to send CloudWatch metrics:', error);
+    throw error;
+  }
 }
 
 // Send SNS notification for critical alerts
 async function sendSNSNotification(alert: Alert, anomaly?: Anomaly): Promise<void> {
-  const notification: SNSNotification = {
-    TopicArn: process.env.CRITICAL_ALERTS_SNS_TOPIC || 'arn:aws:sns:us-east-1:123456789012:manufacturing-critical-alerts',
+  const topicArn = process.env.ALERTS_TOPIC_ARN || process.env.CRITICAL_ALERTS_SNS_TOPIC;
+  
+  if (!topicArn) {
+    console.warn('⚠️  No SNS topic ARN configured, skipping SNS notification');
+    return;
+  }
+
+  const command = new PublishCommand({
+    TopicArn: topicArn,
     Subject: `🚨 CRITICAL ALERT: ${alert.type} - Equipment ${alert.equipment_id}`,
     Message: formatAlertMessage(alert, anomaly),
     MessageAttributes: {
@@ -144,16 +176,16 @@ async function sendSNSNotification(alert: Alert, anomaly?: Anomaly): Promise<voi
         StringValue: alert.type
       }
     }
-  };
+  });
 
-  // Simulate SNS publish API call
-  // In production, use AWS SDK SNS client
-  console.log(`SNS Notification sent to ${notification.TopicArn}`);
-  console.log(`Subject: ${notification.Subject}`);
-  console.log(`Message: ${notification.Message.substring(0, 200)}...`);
-
-  // Simulate API latency
-  await new Promise(resolve => setTimeout(resolve, 30));
+  try {
+    const result = await snsClient.send(command);
+    console.log(`✅ SNS Alert sent to ${topicArn} (MessageId: ${result.MessageId})`);
+    console.log(`📧 Subject: ${command.input.Subject}`);
+  } catch (error) {
+    console.error('❌ Failed to send SNS notification:', error);
+    throw error;
+  }
 }
 
 // Format alert message for human readability
@@ -222,21 +254,21 @@ function getSensorMetricName(anomalyType: string): string {
 }
 
 // Get CloudWatch unit for sensor type
-function getSensorUnit(anomalyType: string): string {
-  const units: { [key: string]: string } = {
-    'critical_temperature': 'None', // Celsius
-    'high_temperature': 'None',
-    'critical_vibration': 'None', // g-force
-    'high_vibration': 'None',
-    'critical_pressure': 'None', // PSI
-    'abnormal_pressure': 'None',
-    'power_spike': 'None' // Watts
+function getSensorUnit(anomalyType: string): StandardUnit {
+  const units: { [key: string]: StandardUnit } = {
+    'critical_temperature': StandardUnit.None, // Celsius
+    'high_temperature': StandardUnit.None,
+    'critical_vibration': StandardUnit.None, // g-force
+    'high_vibration': StandardUnit.None,
+    'critical_pressure': StandardUnit.None, // PSI
+    'abnormal_pressure': StandardUnit.None,
+    'power_spike': StandardUnit.None // Watts
   };
-  return units[anomalyType] || 'None';
+  return units[anomalyType] || StandardUnit.None;
 }
 
 // Bulk alert notification for multiple critical alerts
-export async function processBulkCriticalAlerts(alerts: Alert[], anomalies?: Anomaly[]): Promise<AlertNotificationResult[]> {
+export async function processBulkCriticalAlerts(alerts: Alert[], anomalies?: Anomaly[]): Promise<ServiceAlertResult[]> {
   const results = await Promise.all(
     alerts.map((alert, index) => 
       processCriticalAlert(alert, anomalies?.[index])

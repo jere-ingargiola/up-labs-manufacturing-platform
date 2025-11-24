@@ -355,7 +355,7 @@ export class CostOptimizationService {
         created_at: new Date().toISOString(),
         config: {
           database: {
-            connection_string: 'postgresql://acme-dedicated.rds.amazonaws.com:5432/manufacturing',
+            connection_string: 'postgresql://manufacturingplatform-developme-postgresdb113281d2-tsgocyznjzyn.cnqweieki09q.us-east-1.rds.amazonaws.com:5432/manufacturing',
             use_rls: false,
             max_connections: 100
           },
@@ -478,13 +478,80 @@ export class CostMonitoringService {
     });
   }
   
+  // Get AWS account number
+  static async getAwsAccountNumber(): Promise<string> {
+    try {
+      // Method 1: From environment variable (common in Lambda and ECS)
+      if (process.env.AWS_ACCOUNT_ID) {
+        return process.env.AWS_ACCOUNT_ID;
+      }
+      
+      // Method 2: From Lambda context ARN parsing
+      if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
+        // Lambda function ARN format: arn:aws:lambda:region:account-id:function:function-name
+        const functionArn = process.env.AWS_LAMBDA_FUNCTION_ARN;
+        if (functionArn) {
+          const arnParts = functionArn.split(':');
+          if (arnParts.length >= 5 && arnParts[4].match(/^\d{12}$/)) {
+            return arnParts[4];
+          }
+        }
+      }
+      
+      // Method 3: From EC2 instance metadata (if running on EC2)
+      if (process.env.AWS_REGION && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 1000);
+          
+          const response = await fetch('http://169.254.169.254/latest/meta-data/identity-credentials/ec2/security-credentials/ec2-instance', {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            const metadata = await response.json();
+            if (metadata.AccountId) {
+              return metadata.AccountId;
+            }
+          }
+        } catch (metadataError) {
+          console.log('EC2 metadata not available:', metadataError);
+        }
+      }
+      
+      // Method 4: Try to use STS GetCallerIdentity (if AWS SDK is available)
+      try {
+        const { STSClient, GetCallerIdentityCommand } = require('@aws-sdk/client-sts');
+        const sts = new STSClient({});
+        const identity = await sts.send(new GetCallerIdentityCommand({}));
+        if (identity.Account) {
+          return identity.Account;
+        }
+      } catch (sdkError) {
+        console.log('AWS SDK not available or failed:', sdkError);
+      }
+      
+    } catch (error) {
+      console.log('Failed to get AWS account number:', error);
+    }
+    
+    // Fallback: Return unknown
+    console.warn('Could not determine AWS account number, using fallback');
+    return 'UNKNOWN-ACCOUNT';
+  }
+
+  // Generate cost optimization report
+
   // Generate cost optimization report
   static async generateCostReport(): Promise<string> {
     const platformCosts = await CostOptimizationService.calculatePlatformCosts();
+    const accountNumber = await this.getAwsAccountNumber();
     
     const report = `
 # Manufacturing Platform Cost Report
 Generated: ${new Date().toISOString()}
+AWS Account: ${accountNumber}
 
 ## Summary
 - **Total Monthly Cost**: $${platformCosts.total_monthly_cost.toFixed(2)}

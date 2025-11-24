@@ -1,6 +1,7 @@
 // Multi-tier storage service: TimescaleDB + PostgreSQL + S3 archival
 // Enhanced with multi-tenant support and tenant-aware storage
 import { Pool } from 'pg';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { 
   SensorData, Alert, Equipment, ProductionMetrics,
   StorageResult, S3UploadResult, TenantUsageMetrics,
@@ -12,6 +13,11 @@ import { TenantConfigService } from './tenantService';
 let timescalePool: Pool | null = null;
 let postgresPool: Pool | null = null;
 const tenantPools: Map<string, { timescale: Pool; postgres: Pool }> = new Map();
+
+// S3 client for archival
+const s3Client = new S3Client({ 
+  region: process.env.AWS_REGION || 'us-east-1' 
+});
 
 // Get tenant usage metrics (mock implementation - replace with CloudWatch in production)
 function getTenantUsageMetrics(tenantId: string): TenantUsageMetrics {
@@ -231,15 +237,27 @@ export async function storeSensorDataMultiTier(sensorData: SensorData, tenantCon
     result.s3 = s3Result.status === 'fulfilled';
     result.latency_ms = Date.now() - startTime;
 
-    // Log any failures
+    // Log any failures and archive errors
+    const failures: string[] = [];
     if (timescaleResult.status === 'rejected') {
       console.error('TimescaleDB storage failed:', timescaleResult.reason);
+      failures.push(`TimescaleDB: ${timescaleResult.reason}`);
     }
     if (postgresResult.status === 'rejected') {
       console.error('PostgreSQL storage failed:', postgresResult.reason);
+      failures.push(`PostgreSQL: ${postgresResult.reason}`);
     }
     if (s3Result.status === 'rejected') {
       console.error('S3 storage failed:', s3Result.reason);
+      failures.push(`S3: ${s3Result.reason}`);
+    }
+
+    // Archive raw sensor data to errors folder if any storage failed
+    if (failures.length > 0) {
+      // Archive the original sensor data for reprocessing
+      archiveErrorToS3(sensorData, tenantContext).catch(archiveError => {
+        console.error('❌ Failed to archive sensor data to errors folder:', archiveError);
+      });
     }
 
     return result;
@@ -336,6 +354,70 @@ async function storeToPostgres(sensorData: SensorData, tenantContext?: TenantCon
   ]);
 }
 
+// Archive raw sensor data to S3 errors/date folder structure when processing fails
+async function archiveErrorToS3(rawSensorData: SensorData, tenantContext?: TenantContext): Promise<S3UploadResult> {
+  try {
+    const date = new Date();
+    const storageConfig = tenantContext ? TenantConfigService.getStorageConfig(tenantContext) : null;
+    
+    let s3Key: string;
+    if (tenantContext?.deployment_type === 'single-tenant') {
+      // Single-tenant: errors organized by date
+      s3Key = `errors/${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${String(date.getHours()).padStart(2, '0')}/${rawSensorData.equipment_id || 'unknown'}-${Date.now()}.json`;
+    } else {
+      // Multi-tenant: include tenant prefix in errors
+      const tenantPrefix = storageConfig?.prefix || `tenants/${tenantContext?.tenant_id}/`;
+      s3Key = `${tenantPrefix}errors/${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${String(date.getHours()).padStart(2, '0')}/${rawSensorData.equipment_id || 'unknown'}-${Date.now()}.json`;
+    }
+    
+    // Store raw sensor data with minimal error metadata
+    const errorS3Data = {
+      ...rawSensorData,
+      error_archived_at: date.toISOString(),
+      error_key: s3Key,
+      processing_failed: true
+    };
+    
+    // Get S3 bucket
+    let bucketName: string;
+    if (tenantContext?.deployment_type === 'single-tenant' && storageConfig?.bucket) {
+      bucketName = storageConfig.bucket;
+    } else {
+      bucketName = process.env.SHARED_S3_BUCKET || process.env.S3_BUCKET_NAME || 'up-labs-manufacturing-data';
+    }
+    
+    const putCommand = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: s3Key,
+      Body: JSON.stringify(errorS3Data, null, 2),
+      ContentType: 'application/json',
+      Metadata: {
+        errorType: 'processing-failed',
+        equipmentId: rawSensorData.equipment_id || 'unknown',
+        tenantId: tenantContext?.tenant_id || 'shared',
+        archivedAt: date.toISOString()
+      }
+    });
+    
+    await s3Client.send(putCommand);
+    
+    console.log(`🚨 Failed Data Archived: ${s3Key} -> s3://${bucketName}/${s3Key}`);
+    
+    return {
+      success: true,
+      key: s3Key,
+      bucket: bucketName,
+      size: JSON.stringify(errorS3Data).length
+    };
+  } catch (error) {
+    console.error('❌ Failed data archival error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed data archival error'
+    };
+  }
+}
+
 // Archive to S3 for long-term storage
 async function archiveToS3(sensorData: SensorData, tenantContext?: TenantContext): Promise<S3UploadResult> {
   try {
@@ -345,29 +427,65 @@ async function archiveToS3(sensorData: SensorData, tenantContext?: TenantContext
     
     let s3Key: string;
     if (tenantContext?.deployment_type === 'single-tenant') {
-      // Single-tenant: no prefix needed in dedicated bucket
-      s3Key = `sensor-data/${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${String(date.getHours()).padStart(2, '0')}/${sensorData.equipment_id}/${sensorData.timestamp}.json`;
+      // Single-tenant: organize by facility ID, equipment ID, then date
+      const facilityId = sensorData.facility_id || 'unknown-facility';
+      s3Key = `${facilityId}/${sensorData.equipment_id}/${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${String(date.getHours()).padStart(2, '0')}/${sensorData.timestamp}.json`;
     } else {
-      // Multi-tenant: include tenant prefix
+      // Multi-tenant: include tenant prefix, facility ID, and equipment ID organization
       const tenantPrefix = storageConfig?.prefix || `tenants/${tenantContext?.tenant_id}/`;
-      s3Key = `${tenantPrefix}sensor-data/${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${String(date.getHours()).padStart(2, '0')}/${sensorData.equipment_id}/${sensorData.timestamp}.json`;
+      const facilityId = sensorData.facility_id || 'unknown-facility';
+      s3Key = `${tenantPrefix}${facilityId}/${sensorData.equipment_id}/${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${String(date.getHours()).padStart(2, '0')}/${sensorData.timestamp}.json`;
     }
     
-    // This would use AWS SDK S3 client in production
+    // Enhanced data with archival metadata
     const s3Data = {
       ...sensorData,
       archived_at: new Date().toISOString(),
       archive_key: s3Key
     };
     
-    // Simulated S3 upload - replace with actual AWS SDK call
-    console.log(`S3 Archive: ${s3Key} (${JSON.stringify(s3Data).length} bytes)`);
+    // Get S3 bucket based on tenant configuration
+    let bucketName: string;
+    if (tenantContext?.deployment_type === 'single-tenant' && storageConfig?.bucket) {
+      // Single-tenant with dedicated bucket
+      bucketName = storageConfig.bucket;
+    } else {
+      // Multi-tenant shared bucket or fallback
+      bucketName = process.env.SHARED_S3_BUCKET || process.env.S3_BUCKET_NAME || 'up-labs-manufacturing-data';
+    }
+    
+    // Upload to S3
+    const putCommand = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: s3Key,
+      Body: JSON.stringify(s3Data, null, 2),
+      ContentType: 'application/json',
+      Metadata: {
+        equipmentId: sensorData.equipment_id,
+        tenantId: tenantContext?.tenant_id || 'shared',
+        sensorType: 'manufacturing',
+        archivedAt: new Date().toISOString()
+      }
+    });
+    
+    await s3Client.send(putCommand);
+    
+    console.log(`✅ S3 Archive: ${s3Key} (${JSON.stringify(s3Data).length} bytes) -> s3://${bucketName}/${s3Key}`);
     
     return {
       success: true,
-      key: s3Key
+      key: s3Key,
+      bucket: bucketName,
+      size: JSON.stringify(s3Data).length
     };
   } catch (error) {
+    console.error('❌ S3 upload failed:', error);
+    
+    // Archive the raw sensor data to errors folder for reprocessing
+    archiveErrorToS3(sensorData, tenantContext).catch(archiveError => {
+      console.error('❌ Failed to archive sensor data to errors folder:', archiveError);
+    });
+    
     return {
       success: false,
       error: error instanceof Error ? error.message : 'S3 upload failed'

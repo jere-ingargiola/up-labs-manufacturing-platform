@@ -13,16 +13,39 @@ function generateUUID(): string {
   });
 }
 
+/**
+ * Manufacturing Platform - Sensor Data Ingestion Handler
+ * 
+ * This Lambda function processes real-time IoT sensor data from manufacturing equipment.
+ * It provides sub-500ms processing with critical anomaly detection and alerting.
+ * 
+ * Key Features:
+ * - Real-time anomaly detection with configurable thresholds
+ * - Multi-tenant data isolation and security
+ * - Critical alert processing via SNS and CloudWatch
+ * - Multi-tier data storage (TimescaleDB + PostgreSQL + S3)
+ * - Sub-500ms SLA compliance monitoring
+ * 
+ * @param event API Gateway proxy event containing sensor data
+ * @returns Promise<APIGatewayProxyResult> with processing results
+ */
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   return withTenantContext(event, async (tenantContext, event) => {
     const startTime = Date.now();
     
     try {
-      // Track tenant usage
+      // Track tenant usage for billing and analytics
       await TenantMetricsService.trackUsage(tenantContext, 'sensor-data-ingestion');
 
-      // Parse the incoming payload
-      const sensorData: SensorData = JSON.parse(event.body || '{}');
+      // Parse the incoming payload with proper error handling
+      let sensorData: SensorData;
+      try {
+        sensorData = JSON.parse(event.body || '{}');
+      } catch (parseError) {
+        return createErrorResponse(400, 'Invalid JSON format', [
+          parseError instanceof Error ? parseError.message : 'Malformed JSON payload'
+        ]);
+      }
 
     // Fast validation - only check critical fields
     if (!sensorData.equipment_id || !sensorData.timestamp) {
@@ -36,10 +59,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       source: 'iot-webhook'
     };
 
-    // CRITICAL PATH: Detect anomalies first (synchronous, <50ms)
+    // CRITICAL PATH: Real-time anomaly detection (target: <50ms)
+    // Analyzes temperature, vibration, pressure against configurable thresholds
     const anomalies = await detectAnomalies(enrichedData);
     
-    // ULTRA-HIGH PRIORITY: Process critical alerts immediately
+    // ULTRA-HIGH PRIORITY: Process critical alerts immediately for safety
+    // Critical alerts (temperature >180°C, vibration >5.0) trigger immediate notifications
     const criticalAlerts: Promise<void>[] = [];
     const processingLatency = Date.now() - startTime;
     
@@ -61,7 +86,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           processing_latency_ms: processingLatency
         };
 
-        // CRITICAL: Multi-channel alert processing (Kafka + CloudWatch + SNS)
+        // CRITICAL: Multi-channel alert delivery for maximum reliability
+        // - Kafka: Real-time event streaming for downstream systems
+        // - SNS: Email notifications for immediate human response
+        // - CloudWatch: Metrics for monitoring and dashboards
         criticalAlerts.push(
           Promise.all([
             publishAlert('manufacturing-alerts-priority', alert),

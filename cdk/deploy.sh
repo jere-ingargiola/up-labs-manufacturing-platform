@@ -7,7 +7,7 @@ set -e
 echo "🏗️  Building Manufacturing Platform Infrastructure..."
 
 # Navigate to CDK directory
-cd cdk
+#cd cdk
 
 # Install dependencies
 echo "📦 Installing CDK dependencies..."
@@ -42,6 +42,10 @@ if [ -n "$TENANT_ID" ]; then
 else
     echo "  Deployment Type: Multi-Tenant"
 fi
+
+# Set AWS Profile
+export AWS_PROFILE=${AWS_PROFILE:-manufacturing-platform}
+echo "  AWS Profile: $AWS_PROFILE"
 
 # Bootstrap CDK (if needed)
 echo "🥾 Bootstrapping CDK..."

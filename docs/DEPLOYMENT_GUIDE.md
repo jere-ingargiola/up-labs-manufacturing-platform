@@ -76,7 +76,7 @@ export class SharedInfrastructureStack extends cdk.Stack {
     // Multi-tenant TimescaleDB cluster
     const timescaleCluster = new rds.DatabaseCluster(this, 'TimescaleCluster', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
-        version: rds.AuroraPostgresEngineVersion.VER_15_4
+        version: rds.AuroraPostgresEngineVersion.VER_15
       }),
       instanceProps: {
         instanceType: ec2.InstanceType.of(ec2.InstanceClass.R6G, ec2.InstanceSize.XLARGE),
@@ -160,7 +160,7 @@ export class SingleTenantTemplateStack extends cdk.Stack {
 
     // Dedicated RDS cluster
     const dedicatedDb = new rds.DatabaseCluster(this, `${tenantId}-Database`, {
-      engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_15_4 }),
+      engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_15 }),
       instanceProps: {
         instanceType: this.getInstanceTypeForTier(config.subscriptionTier),
         vpc: tenantVpc,
